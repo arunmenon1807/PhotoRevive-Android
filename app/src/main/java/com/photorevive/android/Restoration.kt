@@ -7,6 +7,17 @@ import org.opencv.photo.Photo
 import kotlin.math.*
 
 object Restoration {
+ /** Shared automatic pipeline. The input always remains unchanged. */
+ fun process(bitmap:Bitmap,enhanceColour:Boolean,repairScratches:Boolean):Bitmap {
+  var current=if(enhanceColour) enhance(bitmap) else bitmap.copy(Bitmap.Config.ARGB_8888,false)
+  try {
+   if(repairScratches) {
+    val mask=detectScratches(current)
+    try { val repaired=repair(current,mask);current.recycle();current=repaired } finally { mask.recycle() }
+   }
+   return current
+  } catch(e:Exception) { current.recycle();throw e }
+ }
  fun enhance(bitmap:Bitmap):Bitmap {
   val rgba=Mat();val bgr=Mat();val balanced=Mat();val lab=Mat();val denoised=Mat();val blur=Mat();val sharpened=Mat();val out=Mat()
   val channels=ArrayList<Mat>();val luminance=ArrayList<Mat>()

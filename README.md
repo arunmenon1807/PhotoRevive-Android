@@ -2,7 +2,7 @@
 A separate offline Android app for batch photo enhancement and scratch / narrow-tear repair. Kotlin and bundled OpenCV. Android 10+. No account, backend, Internet permission, image uploads or downloaded models.
 
 ## Use
-Select local photos or a folder (for example Pictures/MemoryBox/Family). Folder import reads images directly in that folder, not nested folders. Choose an output album. Tap a row to repair or preview one image, or process the pending queue in a batch.
+Select local photos or a folder (for example Pictures/MemoryBox/Family). Folder import reads images directly in that folder, not nested folders. Choose an output album. Tap a pending row to see an automatic colour-enhancement preview when enhancement is enabled, or process the pending queue in a batch. Tap a saved row to compare the actual saved output with the original. Continue repair opens the brush editor. Batch processing and automatic preview share one processing pipeline; the colour step is identical to manual Enhance colour.
 
 Enhancement applies conservative grey-world colour balancing, local luminance contrast, light denoising and gentle sharpening. In the editor, pinch to zoom, choose Move to pan, and paint over scratches or narrow tears. Erase removes unwanted marks; Undo removes the latest brush stroke. Detect scratches proposes thin bright/dark structures as red marks. Review them and erase false positives before applying repair. Before/after preview has a draggable divider. Save always writes a new JPEG, quality 97, to Pictures/PhotoRevive/<Album>/.
 
@@ -27,3 +27,8 @@ On Android, download the artifact ZIP, extract it in Files, tap PhotoRevive-debu
 
 ## Tests
 Unit tests cover safe destination names. Emulator tests cover scratch detection, masked inpainting, overly large mask rejection, enhancement and empty masks, MediaStore JPEG export, and a two-photo batch that verifies original file hashes remain unchanged. Real old photos and a range of phones still require manual quality testing.
+
+## Version 1.1
+Saved rows now load the exported result rather than displaying a fresh unprocessed source. Pending rows automatically preview the selected colour enhancement. Existing saved copies are not reprocessed or overwritten. Emulator regression tests compare automatic processing with manual enhancement and check batch JPEGs against the manually enhanced source, allowing for JPEG compression.
+
+The initial 1.0 build used an ephemeral debug signing key. Android may require uninstalling that build before installing 1.1 because the signatures differ. Public saved JPEGs and originals remain on the phone; the selection queue and settings are cleared on uninstall. Subsequent CI builds reuse a cached debug key while that cache is available. These are test builds, not a production signing setup.

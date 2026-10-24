@@ -103,7 +103,7 @@ class MainActivity:ComponentActivity() {
   val done=session.entries.count { it.state=="done" };val pending=session.entries.count { it.state=="pending" };val failed=session.entries.count { it.state=="failed" }
   label("${session.entries.size} selected • $done saved • $pending pending • $failed failed",13f)
   val list=ListView(this)
-  list.adapter=ArrayAdapter(this,android.R.layout.simple_list_item_1,session.entries.mapIndexed { i,e -> "${i+1}. ${if(e.state=="done")"Saved ✓" else if(e.state=="failed")"Failed: ${e.error.take(65)}" else "Tap to preview / repair"}" })
+  list.adapter=ArrayAdapter(this,android.R.layout.simple_list_item_1,session.entries.mapIndexed { i,e -> "${i+1}. ${if(e.state=="done")"Saved ✓" else if(e.state=="failed")"Failed: ${e.error.take(65)}" else "Tap for auto preview / repair"}" })
   root.addView(list,LinearLayout.LayoutParams(-1,0,1f))
   list.setOnItemClickListener { _,_,position,_ -> if(!busy) { rememberAlbum();openPhoto(position) } }
   button("Enhance / repair all pending photos") {
@@ -118,14 +118,19 @@ class MainActivity:ComponentActivity() {
   },"Clear selection" to {
    android.app.AlertDialog.Builder(this).setMessage("Clear this queue? Saved photos and originals stay on your phone.").setPositiveButton("Clear") { _,_ -> session.entries.clear();session.save();home() }.setNegativeButton("Cancel",null).show()
   })
-  label("New JPEGs: Pictures/PhotoRevive/${session.album}/\nTap a saved row to re-edit its source. Use your Gallery app to browse saved results.",12f)
+  label("New JPEGs: Pictures/PhotoRevive/${session.album}/\nTap a saved row to compare its saved result with the original.",12f)
  }
  private fun openPhoto(position:Int) {
   if(!ready) { toast("Image processing is unavailable. Restart the app.");return }
   task {
-   val source=io.load(session.entries[position].uri)
-   val copy=source.copy(Bitmap.Config.ARGB_8888,false)
-   ui { releaseEditor();original=source;working=copy;selected=position;editor() }
+   val entry=session.entries[position]
+   val source=io.load(entry.uri)
+   val saved=entry.state=="done" && entry.output.isNotBlank()
+   val copy=try {
+    if(saved) io.load(Uri.parse(entry.output))
+    else Restoration.process(source,enhance,false)
+   } catch(e:Exception) { source.recycle();throw e }
+   ui { releaseEditor();original=source;working=copy;selected=position;if(saved || enhance)preview() else editor() }
    if(closed) { source.recycle();copy.recycle() }
   }
  }
@@ -157,7 +162,7 @@ class MainActivity:ComponentActivity() {
  }
  private fun preview() {
   repairView?.dispose();repairView=null
-  screen="preview";base("Before / after")
+  screen="preview";base(if(session.entries[selected].state=="done")"Saved result / original" else "Enhanced preview / original")
   label("Drag the divider to compare. Original on the left; restored on the right.",13f)
   root.addView(CompareView(this,original!!,working!!),LinearLayout.LayoutParams(-1,0,1f))
   rowButtons("Continue repair" to { editor() },"Reset edits" to { val old=working;working=original!!.copy(Bitmap.Config.ARGB_8888,false);editor();old?.recycle() })
@@ -189,11 +194,8 @@ class MainActivity:ComponentActivity() {
      var current:Bitmap?=null
      try {
       current=io.load(entry.uri)
-      if(doEnhance) { val next=Restoration.enhance(current);current.recycle();current=next }
-      if(doRepair) {
-       val mask=Restoration.detectScratches(current)
-       try { val next=Restoration.repair(current,mask);current.recycle();current=next } finally { mask.recycle() }
-      }
+      val processed=Restoration.process(current,doEnhance,doRepair)
+      current.recycle();current=processed
       val output=io.save(album,current)
       entry.state="done";entry.output=output.toString();entry.error=""
      } catch(e:Exception) { entry.state="failed";entry.error=e.message?:"Unreadable image or storage error" }
